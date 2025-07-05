@@ -38,3 +38,5 @@ def batch_processing(batch_size):
         filtered = [user for user in batch if user[3] > 25]  # Loop 2 (list comprehension)
         yield filtered  # Generator does not count as a loop
 
+    return batch_size
+
