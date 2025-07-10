@@ -13,7 +13,7 @@ def stream_users():
             password='admin@123',  
             database='alx_prodev'
         )
-        cursor = conn.cursor()s
+        cursor = conn.cursor()
         cursor.execute("SELECT * FROM user_data")
 
         while True:
