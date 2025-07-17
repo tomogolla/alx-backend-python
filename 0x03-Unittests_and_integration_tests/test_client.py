@@ -32,7 +32,9 @@ class TestGithubOrgClient(unittest.TestCase):
         """
         Tests the `_public_repos_url` property by mocking the `org` property.
         """
-        known_payload = {"repos_url": "https://api.github.com/orgs/google/repos"}
+        known_payload = {
+            "repos_url": "https://api.github.com/orgs/google/repos"
+        }
         with patch.object(
             GithubOrgClient, "org", new_callable=PropertyMock
         ) as mock_org:
@@ -45,18 +47,22 @@ class TestGithubOrgClient(unittest.TestCase):
     @patch('client.get_json')
     def test_public_repos(self, mock_get_json: Mock) -> None:
         """
-        Tests the `public_repos` method by mocking `get_json` and `_public_repos_url`.
+        Tests the `public_repos` method by mocking `get_json` and
+        `_public_repos_url`.
         """
         json_payload = [
-            {"name": "repo-one"},
-            {"name": "repo-two"},
-        ]
+           {"name": "repo-one"},
+           {"name": "repo-two"},
+       ]
+
+
         mock_get_json.return_value = json_payload
 
         with patch.object(
             GithubOrgClient, "_public_repos_url", new_callable=PropertyMock
         ) as mock_public_repos_url:
-            mock_public_repos_url.return_value = "https://api.github.com/orgs/google/repos"
+            repos_url = "https://api.github.com/orgs/google/repos"
+            mock_public_repos_url.return_value = repos_url
             client = GithubOrgClient("google")
             repos = client.public_repos()
 
