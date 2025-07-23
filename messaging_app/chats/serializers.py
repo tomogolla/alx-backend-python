@@ -16,7 +16,8 @@ class UserSerializer(serializers.ModelSerializer):
         ]
         
 class ConversationSerializer(serializers.ModelSerializer):
-    participants = UserSerializer(many=True, read_only=True)
+    participants = serializers.StringRelatedField(many=True, read_only=True)
+    messages = serializers.SerializerMethodField()
     
     class Meta:
         model = Conversation
@@ -25,7 +26,10 @@ class ConversationSerializer(serializers.ModelSerializer):
             'participants',
             'created_at'
         ]
-        
+    
+    def get_messages(self, obj):
+        messages = Message.objects.filter(conversation=obj)
+        return MessageSerializer(messages, many=True).data
         
 class MessageSerializer(serializers.ModelSerializer):
     sender = UserSerializer(read_only=True)
