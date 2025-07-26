@@ -37,6 +37,7 @@ class RestrictAccessByTimeMiddleware:
         return self.get_response(request)
     
     
+    
 class OffensiveLanguageMiddleware:
     def __init__(self, get_response):
         self.get_response = get_response
@@ -72,7 +73,7 @@ class OffensiveLanguageMiddleware:
     
     
 
-class RolePermissionMiddleware:
+class RolepermissionMiddleware:
     def __init__(self, get_response):
         self.get_response = get_response
 
