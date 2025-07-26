@@ -37,7 +37,7 @@ class RestrictAccessByTimeMiddleware:
         return self.get_response(request)
     
     
-class OffesiveLanguageMiddleware:
+class OffensiveLanguageMiddleware:
     def __init__(self, get_response):
         self.get_response = get_response
         self.request_times = defaultdict(list)
@@ -68,3 +68,30 @@ class OffesiveLanguageMiddleware:
         if x_forwaded_for:
             return x_forwaded_for.split(',')[0]
         return request.META.get('REMOTE_ADDR')
+    
+    
+    
+
+class RolePermissionMiddleware:
+    def __init__(self, get_response):
+        self.get_response = get_response
+
+    def __call__(self, request):
+        # Only enforce role check on specific paths
+        admin_paths = ['/chats/delete/', '/chats/manage/']  # Customize these
+        if any(request.path.startswith(path) for path in admin_paths):
+            user = getattr(request, 'user', None)
+            if not user or not user.is_authenticated:
+                return JsonResponse(
+                    {"error": "Authentication required."},
+                    status=403
+                )
+
+            # Check for valid role
+            if not hasattr(user, 'role') or user.role not in ['admin', 'moderator']:
+                return JsonResponse(
+                    {"error": "You do not have permission to access this resource."},
+                    status=403
+                )
+
+        return self.get_response(request)
