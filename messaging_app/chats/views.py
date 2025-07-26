@@ -4,8 +4,11 @@ from rest_framework.permissions import IsAuthenticated
 from .models import Conversation, Message
 from .serializers import ConversationSerializer, MessageSerializer
 from django.contrib.auth import get_user_model
-from .permissions import IsOwner
-
+from .permissions import IsOwner, IsParticipantOfConversation
+from rest_frameworks.decorators import action
+from django_filters.rest_framework import DjangoFilterBackend
+from .pagination import MessagePagination
+from .filters import MessageFilter
 
 
 User = get_user_model()
@@ -38,14 +41,28 @@ class MessageViewSet(viewsets.ModelViewSet):
     queryset = Message.objects.all()
     serializer_class = MessageSerializer
     permission_classes = [permissions.IsAuthenticated, IsParticipantOfConversation]
-    
+    pagination_class = MessagePagination
+    filter_backends = [DjangoFilterBackend]
+    filterset_class = MessageFilter
     
     def perform_create(self, serializer):
         """ 
         set the sender to the current authenticated user
         """
-        serializer.save(sender = self.request.user)
+        conversation_id = self.request.data.get('conversation')
+        user = self.request.user
 
+        try:
+            conversation = Conversation.objects.get(id=conversation_id)
+        except Conversation.DoesNotExist:
+            return Response({'error': 'Conversation not found'}, status=status.HTTP_404_NOT_FOUND)
+
+        # Check if user is part of the conversation
+        if user not in conversation.participants.all():
+            return Response({'error': 'You are not allowed to send messages to this conversation'},
+                            status=status.HTTP_403_FORBIDDEN)
+
+        serializer.save(sender=user, conversation=conversation)
 
 class MessageListView(generics.ListAPIView):
     queryset = Message.objects.all()
