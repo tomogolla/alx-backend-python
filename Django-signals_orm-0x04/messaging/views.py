@@ -7,6 +7,7 @@ from django.shortcuts import render
 from django.contrib.auth.decorators import login_required
 from .models import Message
 from django.db.models import Prefetch
+from django.views.decorators.cache import cache_page
 
 User = get_user_model()
 
@@ -41,8 +42,13 @@ def unread_messages_view(request):
         'unread_messages': unread_messages
     }
     
-    unread_messages = Message.unread.unread_for_user(request.user)
+    unread_messages = Message.unread.unread_for_user(request.user).only('id', 'content', 'sender_id', 'timestamp')
     return render(request, 'messaging/unread_messages.html', {
         'unread_messages': unread_messages
     })
 
+
+@cache_page(60)
+def message_list(request, conversation_id):
+    messages = Message.objects.filter(conversation_id=conversation_id)
+    return render(request, 'messaging/message_list.html', {'messages': messages})

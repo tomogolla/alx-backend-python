@@ -26,7 +26,7 @@ class Message(models.Model):
         'self', null=True, blank=True, on_delete=models.CASCADE, related_name='replies'
     )
     read = models.BooleanField(default=False)
-    
+    edited = models.BooleanField(default=False)
     objects = models.Manager()  # Default manager
     unread = UnreadMessagesManager() 
     
@@ -59,18 +59,13 @@ class Notification(models.Model):
 
 
 
-class Message(models.Model):
-    sender = models.ForeignKey(
-        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='sent_messages'
-    )
-    receiver = models.ForeignKey(
-        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='received_messages'
-    )
-    content = models.TextField()
-    timestamp = models.DateTimeField(auto_now_add=True)
 
-    parent_message = models.ForeignKey(
-        'self', null=True, blank=True, on_delete=models.CASCADE, related_name='replies'
-    )
-    read = models.BooleanField(default=False)
 
+class MessageHistory(models.Model):
+    message = models.ForeignKey(Message, on_delete=models.CASCADE, related_name='edit_history')
+    old_content = models.TextField()
+    edited_at = models.DateTimeField(auto_now_add=True)  # ✅ Timestamp of the edit
+    edited_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True)  # ✅ Who edited it
+
+    def __str__(self):
+        return f"Edit by {self.edited_by} on {self.edited_at}"
