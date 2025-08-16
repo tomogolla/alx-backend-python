@@ -1,0 +1,58 @@
+#!/bin/bash
+# Script to apply a rolling update and monitor for downtime.
+
+DEPLOYMENT_NAME="django-app-blue"
+SERVICE_NAME="django-app-service"
+
+# Function to clean up background processes on exit
+cleanup() {
+    echo -e "\n Cleaning up background processes..."
+    # The '|| true' prevents errors if the process is already gone
+    kill $PF_PID || true
+    kill $CURL_PID || true
+    echo "Cleanup complete."
+    exit 0
+}
+trap cleanup INT TERM
+
+echo "### Rolling Update Test Script ###"
+
+# Ensure the 'blue' service from the previous task is active
+echo "Ensuring service is active and pointing to blue deployment..."
+kubectl apply -f kubeservice.yaml
+
+# Start port-forwarding in the background
+kubectl port-forward service/$SERVICE_NAME 8080:80 > /dev/null 2>&1 &
+PF_PID=$!
+sleep 2 # Give it a moment to start
+
+# Start a continuous curl loop to check for downtime
+echo "Starting health check loop to monitor for downtime..."
+(
+    while true; do
+        CODE=$(curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:8080/)
+        echo "$(date +%T) - App status: HTTP $CODE"
+        if [ "$CODE" != "200" ]; then
+            echo "DOWNTIME DETECTED! Received non-200 HTTP code: $CODE"
+        fi
+        sleep 0.5
+    done
+) &
+CURL_PID=$!
+
+# Apply the updated deployment file to trigger the rolling update
+echo " Applying updated deployment to trigger rolling update..."
+kubectl apply -f blue_deployment.yaml
+
+# Monitor the update progress (this command will block until done)
+echo "Monitoring rollout status... (This may take a few moments)"
+kubectl rollout status deployment/$DEPLOYMENT_NAME
+
+echo "Rolling update complete."
+
+# Verify the final state by checking the pods
+echo "Verifying final pod status..."
+kubectl get pods --selector=app=django-messaging-app,version=blue
+
+# Clean up and exit
+cleanup

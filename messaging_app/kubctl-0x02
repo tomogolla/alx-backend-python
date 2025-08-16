@@ -1,0 +1,26 @@
+#!/bin/bash
+# Script to deploy both blue and green versions and check for errors.
+
+echo "### Blue-Green Deployment Setup Script ###"
+
+# 1. Deploy the blue version and the service pointing to it
+echo "Deploying Blue version (v1.0) and the service..."
+kubectl apply -f blue_deployment.yaml
+kubectl apply -f kubeservice.yaml
+echo "Blue deployment and service applied."
+
+# 2. Deploy the green version alongside the blue one
+echo "Deploying Green version (v2.0)..."
+kubectl apply -f green_deployment.yaml
+echo "Green deployment applied."
+
+# Wait for the green pods to be created and start running
+echo "Waiting for green pods to start..."
+sleep 15 
+
+# 3. Check for errors in the logs of the new green pods
+echo "Checking logs of the new 'green' pods for errors..."
+kubectl logs --selector=app=django-messaging-app,version=green --tail=50
+
+echo "### Script Finished ###"
+echo "To switch traffic to green, run: kubectl patch service django-app-service -p '{\"spec\":{\"selector\":{\"version\":\"green\"}}}'"

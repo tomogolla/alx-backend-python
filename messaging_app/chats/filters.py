@@ -2,11 +2,18 @@ import django_filters
 from .models import Message
 
 class MessageFilter(django_filters.FilterSet):
-    start_date = django_filters.DateTimeFilter(field_name="timestamp", lookup_expr='gte')
-    end_date = django_filters.DateTimeFilter(field_name="timestamp", lookup_expr='lte')
-    sender = django_filters.CharFilter(field_name="sender__email", lookup_expr='icontains')
-    conversation = django_filters.CharFilter(field_name="conversation__id")
+    """
+    FilterSet for querying Messages by sender and time range.
+    """
+    # Filter by the sender's email
+    sender_email = django_filters.CharFilter(field_name='sender__email', lookup_expr='icontains')
+
+    # Filter messages sent after a certain datetime
+    start_date = django_filters.DateTimeFilter(field_name="sent_at", lookup_expr='gte')
+
+    # Filter messages sent before a certain datetime
+    end_date = django_filters.DateTimeFilter(field_name="sent_at", lookup_expr='lte')
 
     class Meta:
         model = Message
-        fields = ['sender', 'conversation', 'start_date', 'end_date']
+        fields = ['sender_email', 'start_date', 'end_date']
