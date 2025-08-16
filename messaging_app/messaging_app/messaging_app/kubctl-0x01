@@ -1,0 +1,40 @@
+#!/bin/bash
+# Scale the Django App Using Kubernetes
+# Use kubectl scale to increase the number of replicas to 3 of your Django app deployment.
+# Verify that multiple pods are running by using kubectl get pods.
+# Perform load testing on your app using wrk to see how the scaled app handles traffic
+# Monitors Resource Usage using kubectl top
+
+# scaling deployment to 3 replicas
+kubectl scale deployment/messaging-app --replicas=3
+
+# Waiting for pods to scale up
+sleep 30
+
+# verifies multiple pods are running
+kubectl get pods -l app=messaging-app
+
+# Check if 'wrk' is installed
+if ! command -v wrk &> /dev/null
+then
+  echo "'wrk' could not be found. Please install it to perform load testing."
+  exit 1
+fi
+
+# 'port-forward' to access the ClusterIP service
+kubectl port-forward service/messaging-app-service 8000:80 &
+
+# Store the port-forward process ID to terminate it later
+PORT_FORWARD_PID=$!
+
+# Wait a moment for the port-forward to establish connection
+sleep 5
+
+# Run the load test for 30 seconds with 4 threads and 100 connections
+wrk -t4 -c100 -d30s http://localhost:8000/
+
+# Kill the port-forward process in the background
+kill $PORT_FORWARD_PID
+
+# Monitors Resource Usage using kubectl top
+kubectl top pods -l app=messaging-app
