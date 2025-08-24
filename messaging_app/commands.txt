@@ -1,7 +1,1 @@
-# Commands for setting up and applying the Ingress
-
-# 1. Enable the Nginx Ingress controller addon in Minikube
-minikube addons enable ingress
-
-# 2. Apply the Ingress configuration from the YAML file
 kubectl apply -f ingress.yaml

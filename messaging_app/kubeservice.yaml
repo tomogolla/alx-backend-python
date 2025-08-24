@@ -1,16 +1,13 @@
-# The service that routes traffic to one of the versions
 apiVersion: v1
 kind: Service
 metadata:
-  name: django-app-service
+  name: messaging-app-service
 spec:
-  type: ClusterIP
   selector:
-    # IMPORTANT: This selector initially points traffic to the 'blue' version.
-    # The scripts in tasks 4 and 5 rely on this service to find the pods.
-    app: django-messaging-app
-    version: blue
+    app: messaging-app
+    version: blue  # Change this to 'green' to switch traffic
   ports:
     - protocol: TCP
-      port: 80       # The port the service exposes.
-      targetPort: 8000 # The port the application container listens on.
+      port: 8000
+      targetPort: 8000
+  type: ClusterIP

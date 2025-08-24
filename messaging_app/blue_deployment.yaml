@@ -1,29 +1,29 @@
-# The "Blue" deployment, updated to trigger a rolling update
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: django-app-blue
+  name: messaging-app-blue
+  labels:
+    app: messaging-app
+    version: blue
 spec:
-  replicas: 3 # Using 3 replicas to better observe the rolling update
+  replicas: 3
   selector:
     matchLabels:
-      app: django-messaging-app
+      app: messaging-app
       version: blue
-  # The strategy for the update
   strategy:
     type: RollingUpdate
     rollingUpdate:
-      maxUnavailable: 1 # Only 1 pod can be unavailable at a time
-      maxSurge: 1       # We can create 1 extra pod during the update
+      maxUnavailable: 1
+      maxSurge: 1
   template:
     metadata:
       labels:
-        app: django-messaging-app
+        app: messaging-app
         version: blue
     spec:
       containers:
-      - name: django-app
-        # This image tag is updated from 1.0 to 2.0 to trigger the update
-        image: your-dockerhub-username/messaging-app:2.0
-        ports:
-        - containerPort: 8000
+        - name: messaging-app
+          image: your-dockerhub-username/messaging-app:2.0
+          ports:
+            - containerPort: 8000

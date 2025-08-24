@@ -1,88 +1,177 @@
-import uuid
 from django.db import models
-from django.contrib.auth.models import AbstractBaseUser, PermissionsMixin, BaseUserManager
+from django.contrib.auth.models import AbstractUser
+import uuid
 
-class CustomUserManager(BaseUserManager):
+class User(AbstractUser):
     """
-    Custom manager for the User model where email is the unique identifier.
+    Extended User model that inherits from Django's AbstractUser.
+    Adds additional fields required by the application.
     """
-    def create_user(self, email, password=None, **extra_fields):
-        if not email:
-            raise ValueError('The Email field must be set')
-        email = self.normalize_email(email)
-        user = self.model(email=email, **extra_fields)
-        user.set_password(password) # Hashes the password
-        user.save(using=self._db)
-        return user
-
-    def create_superuser(self, email, password=None, **extra_fields):
-        extra_fields.setdefault('is_staff', True)
-        extra_fields.setdefault('is_superuser', True)
-        extra_fields.setdefault('role', 'admin') # Superuser should have admin role
-
-        if extra_fields.get('is_staff') is not True:
-            raise ValueError('Superuser must have is_staff=True.')
-        if extra_fields.get('is_superuser') is not True:
-            raise ValueError('Superuser must have is_superuser=True.')
-
-        return self.create_user(email, password, **extra_fields)
-
-class User(AbstractBaseUser, PermissionsMixin):
-    """
-    Custom User model that satisfies the project's schema requirements.
-    """
-    # These fields are now explicitly defined
-    user_id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    first_name = models.CharField(max_length=150)
-    last_name = models.CharField(max_length=150)
-    email = models.EmailField(unique=True)
-    # The 'password' field is inherited from AbstractBaseUser
-
-    # Additional fields from the schema
-    phone_number = models.CharField(max_length=15, blank=True, null=True)
-    ROLE_CHOICES = (
+    ROLE_CHOICES = [
         ('guest', 'Guest'),
         ('host', 'Host'),
         ('admin', 'Admin'),
-    )
-    role = models.CharField(max_length=10, choices=ROLE_CHOICES, default='guest')
+    ]
     
-    # Required fields for Django admin and PermissionsMixin
-    is_staff = models.BooleanField(default=False)
-    is_active = models.BooleanField(default=True)
-
-    objects = CustomUserManager()
-
-    # Set the email field as the unique identifier
-    USERNAME_FIELD = 'email'
-    REQUIRED_FIELDS = ['first_name', 'last_name']
-
+    user_id = models.UUIDField(
+        primary_key=True,
+        default=uuid.uuid4,
+        editable=False,
+        db_index=True
+    )
+    first_name = models.CharField(max_length=150, null=False, blank=False)
+    last_name = models.CharField(max_length=150, null=False, blank=False)
+    email = models.EmailField(unique=True, null=False, blank=False)
+    
+    phone_number = models.CharField(max_length=20, null=True, blank=True)
+    role = models.CharField(
+        max_length=10,
+        choices=ROLE_CHOICES,
+        null=False,
+        blank=False,
+        default='guest'
+    )
+    
+    # Django's AbstractUser already provides:
+    # - password field (handled by Django's auth system)
+    # - date_joined (equivalent to created_at)
+    class Meta:
+        db_table = 'auth_user'  # Keep Django's default user table name
+        indexes = [
+            models.Index(fields=['email']),  # Additional index on email
+        ]
+    
     def __str__(self):
-        return self.email
+        return f"{self.first_name} {self.last_name} ({self.email})"
+
 
 class Conversation(models.Model):
     """
-    Conversation model with a 'conversation_id' primary key.
+    Model to track conversations between users.
+    Uses a many-to-many relationship to handle multiple participants.
     """
-    conversation_id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    participants = models.ManyToManyField(User, related_name='conversations')
+    conversation_id = models.UUIDField(
+        primary_key=True,
+        default=uuid.uuid4,
+        editable=False,
+        db_index=True
+    )
+    
+    participants = models.ManyToManyField(
+        User,
+        related_name='conversations',
+        blank=False
+    )
+    
     created_at = models.DateTimeField(auto_now_add=True)
-
+    
+    class Meta:
+        db_table = 'conversation'
+        indexes = [
+            models.Index(fields=['created_at']),
+        ]
+    
     def __str__(self):
-        return f"Conversation {self.conversation_id}"
+        participant_names = ', '.join([
+            f"{user.first_name} {user.last_name}" 
+            for user in self.participants.all()[:3]
+        ])
+        if self.participants.count() > 3:
+            participant_names += f" and {self.participants.count() - 3} others"
+        return f"Conversation: {participant_names}"
+
 
 class Message(models.Model):
     """
-    Message model with a 'message_id' primary key.
+    Model to store individual messages within conversations.
     """
-    message_id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    conversation = models.ForeignKey(Conversation, on_delete=models.CASCADE, related_name='messages')
-    sender = models.ForeignKey(User, on_delete=models.CASCADE, related_name='sent_messages')
-    message_body = models.TextField()
+    message_id = models.UUIDField(
+        primary_key=True,
+        default=uuid.uuid4,
+        editable=False,
+        db_index=True
+    )
+    
+    sender = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name='sent_messages',
+        null=False
+    )
+    
+    conversation = models.ForeignKey(
+        Conversation,
+        on_delete=models.CASCADE,
+        related_name='messages',
+        null=False
+    )
+    
+    message_body = models.TextField(null=False, blank=False)
+    
     sent_at = models.DateTimeField(auto_now_add=True)
-
+    
     class Meta:
-        ordering = ['sent_at']
-
+        db_table = 'message'
+        indexes = [
+            models.Index(fields=['sender']),
+            models.Index(fields=['conversation']),
+            models.Index(fields=['sent_at']),
+            models.Index(fields=['conversation', 'sent_at']),  # Compound index for efficient message retrieval
+        ]
+        ordering = ['sent_at']  # Default ordering by timestamp
+    
     def __str__(self):
-        return f"Message from {self.sender.username} at {self.sent_at}"
+        return f"Message from {self.sender.first_name} at {self.sent_at.strftime('%Y-%m-%d %H:%M')}"
+    
+    def clean(self):
+        """
+        Custom validation to ensure sender is a participant in the conversation.
+        """
+        from django.core.exceptions import ValidationError
+        
+        if self.conversation and self.sender:
+            if not self.conversation.participants.filter(id=self.sender.id).exists():
+                raise ValidationError(
+                    "Sender must be a participant in the conversation."
+                )
+
+
+# Additional utility methods that might be helpful
+class ConversationManager(models.Manager):
+    """
+    Custom manager for Conversation model with useful query methods.
+    """
+    def get_user_conversations(self, user):
+        """Get all conversations for a specific user."""
+        return self.filter(participants=user)
+    
+    def get_conversation_between_users(self, user1, user2):
+        """Get conversation between two specific users (if exists)."""
+        return self.filter(
+            participants=user1
+        ).filter(
+            participants=user2
+        ).filter(
+            participants__count=2
+        ).first()
+
+
+# Add the custom manager to Conversation model
+Conversation.add_to_class('objects', ConversationManager())
+
+
+class MessageManager(models.Manager):
+    """
+    Custom manager for Message model with useful query methods.
+    """
+    def get_conversation_messages(self, conversation):
+        """Get all messages for a specific conversation, ordered by timestamp."""
+        return self.filter(conversation=conversation).order_by('sent_at')
+    
+    def get_user_messages(self, user):
+        """Get all messages sent by a specific user."""
+        return self.filter(sender=user)
+
+
+# Add the custom manager to Message model  
+Message.add_to_class('objects', MessageManager())

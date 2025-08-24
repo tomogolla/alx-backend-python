@@ -1,0 +1,43 @@
+#!/bin/bash
+# Script: kubctl-0x01
+# Purpose: Scale Django app to 3 replicas, verify pods, load test, and monitor resource usage.
+
+set -e
+
+DEPLOYMENT_NAME="messaging-app-deployment"
+SERVICE_NAME="messaging-app-service"
+NAMESPACE="default"
+
+echo "📦 Scaling $DEPLOYMENT_NAME to 3 replicas..."
+kubectl scale deployment $DEPLOYMENT_NAME --replicas=3 --namespace=$NAMESPACE
+
+echo "⏳ Waiting for pods to be ready..."
+kubectl rollout status deployment/$DEPLOYMENT_NAME --namespace=$NAMESPACE
+
+echo "✅ Current pods:"
+kubectl get pods --namespace=$NAMESPACE -o wide
+
+# Port-forward so wrk can hit the app
+echo "🔌 Port-forwarding $SERVICE_NAME to localhost:8000..."
+kubectl port-forward service/$SERVICE_NAME 8000:8000 --namespace=$NAMESPACE &
+PF_PID=$!
+
+# Give port-forward a moment to start
+sleep 5
+
+# Run load test with wrk (ensure wrk is installed)
+if command -v wrk &> /dev/null; then
+    echo "🚀 Running load test with wrk..."
+    wrk -t4 -c50 -d10s http://127.0.0.1:8000/
+else
+    echo "⚠️ wrk is not installed. Skipping load test."
+fi
+
+# Kill the port-forward process
+kill $PF_PID
+
+# Monitor resource usage
+echo "Resource usage:"
+kubectl top pods --namespace=$NAMESPACE || echo "⚠️Metrics server not installed. Skipping resource usage stats."
+
+echo "Done!"

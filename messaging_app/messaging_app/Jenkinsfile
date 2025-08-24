@@ -1,0 +1,79 @@
+pipeline {
+    agent any
+
+    environment {
+        REPO_URL = 'https://github.com/master_dev/alx-backend-python.git'
+        GIT_CREDENTIALS = 'github-creds'
+        VENV_DIR = '.venv'
+        DOCKERHUB_CREDENTIALS = 'dockerhub-creds'   // Jenkins stored creds
+        DOCKER_IMAGE = 'alpha_dev/messaging_app'
+    }
+
+    stages {
+        stage('Checkout') {
+            steps {
+                git branch: 'main',
+                    credentialsId: "${GIT_CREDENTIALS}",
+                    url: "${REPO_URL}"
+            }
+        }
+
+        stage('Setup Python') {
+            steps {
+                withPythonEnv('/usr/bin/python3') {
+                    sh """
+                        python -m venv ${VENV_DIR}
+                        source ${VENV_DIR}/bin/activate
+                        pip3 install --upgrade pip
+                        pip3 install -r messaging_app/requirements.txt
+                    """
+                }
+            }
+        }
+
+        stage('Run Tests') {
+            steps {
+                withPythonEnv("${VENV_DIR}/bin/python") {
+                    sh """
+                        source ${VENV_DIR}/bin/activate
+                        pytest messaging_app/tests/ --junitxml=reports/results.xml
+                    """
+                }
+            }
+            post {
+                always {
+                    junit 'reports/results.xml'
+                }
+            }
+        }
+
+        stage('Build Docker Image') {
+            steps {
+                script {
+                    sh """
+                        docker build -t ${DOCKER_IMAGE}:${BUILD_NUMBER} messaging_app
+                    """
+                }
+            }
+        }
+
+        stage('Push Docker Image') {
+            steps {
+                script {
+                    withCredentials([usernamePassword(credentialsId: "${DOCKERHUB_CREDENTIALS}", usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
+                        sh """
+                            echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
+                            docker push ${DOCKER_IMAGE}:${BUILD_NUMBER}
+                            docker tag ${DOCKER_IMAGE}:${BUILD_NUMBER} ${DOCKER_IMAGE}:latest
+                            docker push ${DOCKER_IMAGE}:latest
+                        """
+                    }
+                }
+            }
+        }
+    }
+
+    triggers {
+        // Manual trigger only
+    }
+}
